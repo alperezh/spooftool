@@ -45,6 +45,7 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(128))
     name = db.Column(db.String(100))
     company = db.Column(db.String(100))
+    is_admin = db.Column(db.Boolean, default=False)  # Campo para identificar administradores
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     emails = db.relationship('SentEmail', backref='user', lazy=True)
 
@@ -316,7 +317,7 @@ def profile():
 @login_required
 def auditlog():
     # Verificar si el usuario actual es administrador
-    if current_user.email != 'admin@dmarcdefense.com':
+    if not current_user.is_admin:
         flash('No tienes permisos para acceder a esta página', 'danger')
         return redirect(url_for('send_email'))
     
@@ -476,11 +477,12 @@ def create_admin():
     admin_exists = User.query.filter_by(email=admin_email).first()
     
     if not admin_exists:
-        print("✅ Creando usuario administrador...")
+        print("✅ Creando usuario administrador predeterminado...")
         admin = User(
             email=admin_email,
             name='Administrador',
             company='DMARCDefense',
+            is_admin=True,  # Marcar como administrador
             password_hash=generate_password_hash('admin123')
         )
         try:
@@ -493,7 +495,38 @@ def create_admin():
             db.session.rollback()
             print(f"❌ Error al crear el administrador: {e}")
     else:
-        print("ℹ️ El usuario administrador ya existe")
+        # Asegurar que el usuario admin tiene el campo is_admin=True
+        if not hasattr(admin_exists, 'is_admin') or not admin_exists.is_admin:
+            admin_exists.is_admin = True
+            try:
+                db.session.commit()
+                print("✅ Usuario administrador actualizado con permisos de administrador")
+            except Exception as e:
+                db.session.rollback()
+                print(f"❌ Error al actualizar permisos de administrador: {e}")
+        else:
+            print("ℹ️ El usuario administrador ya existe")
+            
+    # Verificar si hay otros usuarios marcados como administradores
+    # Esto es útil para sistemas donde se han creado administradores personalizados
+    other_admins = User.query.filter(User.is_admin == True, User.email != admin_email).all()
+    if other_admins:
+        print(f"ℹ️ Otros administradores encontrados: {len(other_admins)}")
+        for admin in other_admins:
+            print(f"   - {admin.email}")
+    
+    # Si el usuario actual existe en la base de datos y su nombre es "Administrador", 
+    # convertirlo en administrador si no lo es ya
+    try:
+        existing_admins = User.query.filter_by(name='Administrador').all()
+        for admin in existing_admins:
+            if not admin.is_admin:
+                admin.is_admin = True
+                print(f"✅ Usuario {admin.email} actualizado a administrador.")
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Error al actualizar administradores existentes: {e}")
 
 # Punto de entrada
 if __name__ == '__main__':

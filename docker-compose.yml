@@ -8,9 +8,9 @@ services:
       - "8000:8000"
     restart: unless-stopped
     environment:
-      - SECRET_KEY=dmarcdefense_clave_secreta_2024
-     - API_URL=${API_URL:-http://relay.dmarcd.net:5000/execute}
-     - API_TOKEN=${API_TOKEN:-006ed549912bc9d6c43c477242b1724103caa02b}
+      - SECRET_KEY=${SECRET_KEY:-clave_temporal_desarrollo}
+      - API_URL=${API_URL}
+      - API_TOKEN=${API_TOKEN}
     volumes:
       - ./instance:/app/instance
     healthcheck:

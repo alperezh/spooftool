@@ -47,5 +47,8 @@ shell:
 	docker exec -it $(APP_NAME) /bin/bash
 
 create-admin:
-	@bash setup_admin.sh
+	@echo "🔑 Creando usuario administrador..."
+	docker exec -it $(APP_NAME) python create_admin.py
 
+make-admin:
+	@bash make_admin.sh
