@@ -9,6 +9,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from email_validator import validate_email, EmailNotValidError
 
 app = Flask(__name__)
+app.jinja_env.globals['hasattr'] = hasattr
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
 if not app.config['SECRET_KEY']:
     app.config['SECRET_KEY'] = 'clave_temporal_solo_desarrollo'
