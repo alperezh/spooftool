@@ -2,7 +2,7 @@
 
 APP_NAME=dmarcdefensespoofingtool-dmarcdefense-app-1
 TEMPLATES_DIR=templates
-REQUIRED_TEMPLATES=form.html success.html error.html
+REQUIRED_TEMPLATES=form.html success.html error.html login.html register.html profile.html auditlog.html
 
 check-templates:
 	@echo "🔍 Verificando templates..."
@@ -16,17 +16,18 @@ check-templates:
 
 up: check-templates
 	docker-compose up --build -d
-	@echo "Esperando a que la aplicación esté lista..."
+	@echo "⏳ Esperando a que la aplicación esté lista..."
 	@sleep 5
 	docker exec -it $(APP_NAME) python create_admin.py
+
 down:
 	docker-compose down
 
-rebuild:
+rebuild: check-templates
 	docker-compose down
 	docker-compose build
 	docker-compose up -d
-	@echo "Esperando a que la aplicación esté lista..."
+	@echo "⏳ Esperando a que la aplicación esté lista..."
 	@sleep 5
 	docker exec -it $(APP_NAME) python create_admin.py
 
@@ -44,3 +45,7 @@ restart:
 
 shell:
 	docker exec -it $(APP_NAME) /bin/bash
+
+create-admin:
+	@bash setup_admin.sh
+

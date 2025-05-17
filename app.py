@@ -17,8 +17,9 @@ db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
-API_URL = 'http://relay.dmarcd.net:5000/execute'
-API_TOKEN = '006ed549912bc9d6c43c477242b1724103caa02b'
+# Obtener credenciales de API desde variables de entorno
+API_URL = os.environ.get('API_URL', 'http://relay.dmarcd.net:5000/execute')
+API_TOKEN = os.environ.get('API_TOKEN', '006ed549912bc9d6c43c477242b1724103caa02b')
 
 # Modelos de la base de datos
 class User(UserMixin, db.Model):
@@ -39,12 +40,12 @@ class User(UserMixin, db.Model):
 class SentEmail(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    user_email = db.Column(db.String(120), nullable=False)  # Correo del usuario que envió
-    sender = db.Column(db.String(120), nullable=False)  # Remitente utilizado
+    user_email = db.Column(db.String(120), nullable=True)  # Puede ser nulo para compatibilidad
+    sender = db.Column(db.String(120), nullable=False)
     recipient = db.Column(db.String(200), nullable=False)
     subject = db.Column(db.String(200), nullable=False)
     body = db.Column(db.Text, nullable=False)
-    template_id = db.Column(db.String(10), nullable=True)  # ID de la plantilla usada
+    template_id = db.Column(db.String(10), nullable=True)  # Puede ser nulo para compatibilidad
     status = db.Column(db.String(20), default='sent')
     sent_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -161,6 +162,51 @@ Correo electrónico: billing@LOOKALIKEdomain.com"""
 with app.app_context():
     db.create_all()
 
+# Verificar y añadir columnas nuevas si no existen
+def migrate_database():
+    try:
+        db_path = os.path.join('instance', 'dmarcdefense.db')
+        
+        if not os.path.exists(db_path):
+            print("✅ Base de datos no encontrada, será creada automáticamente")
+            return
+        
+        # Verificar si necesitamos hacer migraciones
+        import sqlite3
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Verificar si las columnas ya existen
+        cursor.execute("PRAGMA table_info(sent_email)")
+        columns = cursor.fetchall()
+        column_names = [column[1] for column in columns]
+        
+        # Añadir columna user_email si no existe
+        if 'user_email' not in column_names:
+            print("ℹ️ Añadiendo columna user_email a la base de datos")
+            cursor.execute("ALTER TABLE sent_email ADD COLUMN user_email TEXT")
+            
+            # Actualizar user_email con el correo del usuario basado en user_id
+            cursor.execute("""
+                UPDATE sent_email 
+                SET user_email = (
+                    SELECT email FROM user WHERE user.id = sent_email.user_id
+                )
+            """)
+            print("✅ Columna user_email añadida y actualizada")
+        
+        # Añadir columna template_id si no existe
+        if 'template_id' not in column_names:
+            print("ℹ️ Añadiendo columna template_id a la base de datos")
+            cursor.execute("ALTER TABLE sent_email ADD COLUMN template_id TEXT DEFAULT 'custom'")
+            print("✅ Columna template_id añadida")
+        
+        # Confirmar cambios y cerrar la conexión
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"❌ Error durante la migración de la base de datos: {str(e)}")
+
 # Rutas para la autenticación
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -229,8 +275,56 @@ def logout():
 @login_required
 def profile():
     # Obtener el historial de correos enviados por el usuario
-    emails = SentEmail.query.filter_by(user_id=current_user.id).order_by(SentEmail.sent_at.desc()).all()
+    try:
+        # Primero intentar consultar con el esquema nuevo (con user_email)
+        emails = SentEmail.query.filter_by(user_id=current_user.id).order_by(SentEmail.sent_at.desc()).all()
+    except Exception as e:
+        print(f"Error en profile: {e}")
+        # Si falla, usar una consulta compatible con el esquema antiguo
+        emails = db.session.query(
+            SentEmail.id,
+            SentEmail.user_id,
+            SentEmail.sender,
+            SentEmail.recipient,
+            SentEmail.subject,
+            SentEmail.body,
+            SentEmail.status,
+            SentEmail.sent_at
+        ).filter(SentEmail.user_id == current_user.id).order_by(SentEmail.sent_at.desc()).all()
+    
     return render_template('profile.html', emails=emails)
+
+# Ruta para el auditlog global (solo administradores)
+@app.route('/auditlog')
+@login_required
+def auditlog():
+    # Verificar si el usuario actual es administrador
+    if current_user.email != 'admin@dmarcdefense.com':
+        flash('No tienes permisos para acceder a esta página', 'danger')
+        return redirect(url_for('send_email'))
+    
+    try:
+        # Intentar obtener los datos con el esquema nuevo
+        all_emails = SentEmail.query.order_by(SentEmail.sent_at.desc()).all()
+    except Exception as e:
+        print(f"Error en auditlog: {e}")
+        # Si falla, hacer una consulta compatible con el esquema antiguo
+        all_emails = db.session.query(
+            SentEmail.id, 
+            SentEmail.user_id,
+            SentEmail.sender, 
+            SentEmail.recipient,
+            SentEmail.subject,
+            SentEmail.body,
+            SentEmail.status,
+            SentEmail.sent_at
+        ).order_by(SentEmail.sent_at.desc()).all()
+    
+    # Obtener todos los usuarios para mostrar sus nombres
+    users = User.query.all()
+    user_dict = {user.id: user for user in users}
+    
+    return render_template('auditlog.html', emails=all_emails, users=user_dict, templates=TEMPLATES)
 
 # Ruta para la página principal, ahora protegida con login_required
 @app.route('/', methods=['GET', 'POST'])
@@ -279,18 +373,39 @@ def send_email():
             print("Respuesta del servidor:", response.text)
 
             # Guardar el correo enviado en la base de datos
-            email_record = SentEmail(
-                user_id=current_user.id,
-                user_email=current_user.email,  # Guardar el correo del usuario que envió
-                sender=sender,
-                recipient=recipient,
-                subject=subject_id,
-                body=body_text,
-                template_id=template_id,
-                status='success' if response.status_code == 200 else 'error'
-            )
-            db.session.add(email_record)
-            db.session.commit()
+            try:
+                # Intenta crear un registro con la estructura nueva
+                email_record = SentEmail(
+                    user_id=current_user.id,
+                    user_email=current_user.email,
+                    sender=sender,
+                    recipient=recipient,
+                    subject=subject_id,
+                    body=body_text,
+                    template_id=template_id,
+                    status='success' if response.status_code == 200 else 'error'
+                )
+                db.session.add(email_record)
+                db.session.commit()
+            except Exception as db_error:
+                print(f"Error al guardar con esquema nuevo: {db_error}")
+                db.session.rollback()
+                
+                # Si falla, crear un registro compatible con la estructura antigua
+                try:
+                    email_record = SentEmail(
+                        user_id=current_user.id,
+                        sender=sender,
+                        recipient=recipient,
+                        subject=subject_id,
+                        body=body_text,
+                        status='success' if response.status_code == 200 else 'error'
+                    )
+                    db.session.add(email_record)
+                    db.session.commit()
+                except Exception as e:
+                    print(f"Error crítico al guardar el correo: {e}")
+                    db.session.rollback()
 
             if response.status_code == 200:
                 return render_template('success.html')
@@ -300,44 +415,77 @@ def send_email():
             print("Error al hacer la solicitud:", e)
             
             # Registrar el error
-            email_record = SentEmail(
-                user_id=current_user.id,
-                user_email=current_user.email,
-                sender=sender,
-                recipient=recipient,
-                subject=subject_id,
-                body=body_text,
-                template_id=template_id,
-                status='error'
-            )
-            db.session.add(email_record)
-            db.session.commit()
+            try:
+                # Intenta crear un registro con la estructura nueva
+                email_record = SentEmail(
+                    user_id=current_user.id,
+                    user_email=current_user.email,
+                    sender=sender,
+                    recipient=recipient,
+                    subject=subject_id,
+                    body=body_text,
+                    template_id=template_id,
+                    status='error'
+                )
+                db.session.add(email_record)
+                db.session.commit()
+            except Exception as db_error:
+                print(f"Error al guardar con esquema nuevo: {db_error}")
+                db.session.rollback()
+                
+                # Si falla, crear un registro compatible con la estructura antigua
+                try:
+                    email_record = SentEmail(
+                        user_id=current_user.id,
+                        sender=sender,
+                        recipient=recipient,
+                        subject=subject_id,
+                        body=body_text,
+                        status='error'
+                    )
+                    db.session.add(email_record)
+                    db.session.commit()
+                except Exception as e:
+                    print(f"Error crítico al guardar el error: {e}")
+                    db.session.rollback()
             
             return render_template('error.html', error_message=str(e))
 
     return render_template('form.html', templates=TEMPLATES)
 
-# Ruta para el auditlog global (solo administradores)
-@app.route('/auditlog')
-@login_required
-def auditlog():
-    # Lista de correos de administradores permitidos
-    admin_emails = ['admin@dmarcdefense.com']
+# Función para crear usuario administrador
+def create_admin():
+    admin_email = 'admin@dmarcdefense.com'
+    admin_exists = User.query.filter_by(email=admin_email).first()
     
-    # Verificar si el usuario actual es administrador
-    if current_user.email not in admin_emails:
-        flash('No tienes permisos para acceder a esta página', 'danger')
-        return redirect(url_for('send_email'))
-    
-    # Obtener todos los correos enviados por todos los usuarios
-    all_emails = SentEmail.query.order_by(SentEmail.sent_at.desc()).all()
-    
-    # Obtener todos los usuarios para mostrar sus nombres
-    users = User.query.all()
-    user_dict = {user.id: user for user in users}
-    
-    return render_template('auditlog.html', emails=all_emails, users=user_dict, templates=TEMPLATES)
+    if not admin_exists:
+        print("✅ Creando usuario administrador...")
+        admin = User(
+            email=admin_email,
+            name='Administrador',
+            company='DMARCDefense',
+            password_hash=generate_password_hash('admin123')
+        )
+        try:
+            db.session.add(admin)
+            db.session.commit()
+            print("✅ Usuario administrador creado con éxito")
+            print(f"   Email: {admin_email}")
+            print(f"   Contraseña: admin123")
+        except Exception as e:
+            db.session.rollback()
+            print(f"❌ Error al crear el administrador: {e}")
+    else:
+        print("ℹ️ El usuario administrador ya existe")
 
 # Punto de entrada
 if __name__ == '__main__':
+    # Inicializar la base de datos y realizar migraciones
+    with app.app_context():
+        db.create_all()
+        # Migrar la base de datos si es necesario
+        migrate_database()
+        # Crear usuario administrador
+        create_admin()
+    
     app.run(host='0.0.0.0', port=8000, debug=True)
