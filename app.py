@@ -9,7 +9,11 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from email_validator import validate_email, EmailNotValidError
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'clave_secreta_predeterminada')
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
+if not app.config['SECRET_KEY']:
+    app.config['SECRET_KEY'] = 'clave_temporal_solo_desarrollo'
+    print("⚠️ ADVERTENCIA: SECRET_KEY no configurada. Usando clave temporal solo para desarrollo.")
+
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///dmarcdefense.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -18,8 +22,21 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
 # Obtener credenciales de API desde variables de entorno
-API_URL = os.environ.get('API_URL', 'http://relay.dmarcd.net:5000/execute')
-API_TOKEN = os.environ.get('API_TOKEN', '006ed549912bc9d6c43c477242b1724103caa02b')
+API_URL = os.environ.get('API_URL')
+API_TOKEN = os.environ.get('API_TOKEN')
+
+# Verificar que las credenciales de API están configuradas
+if not API_URL or not API_TOKEN:
+    print("⚠️ ERROR: Variables de entorno API_URL y API_TOKEN son requeridas.")
+    print("📝 Por favor, configura estas variables como se describe en README.md")
+    # En producción, podrías querer que esto falle rápidamente
+    # Pero para desarrollo, permitimos valores temporales
+    if not API_URL:
+        print("🔄 Usando URL de API temporal para desarrollo")
+        API_URL = 'http://localhost:5000/dummy_endpoint'
+    if not API_TOKEN:
+        print("🔄 Usando token de API temporal para desarrollo")
+        API_TOKEN = 'dummy_token_solo_desarrollo'
 
 # Modelos de la base de datos
 class User(UserMixin, db.Model):
