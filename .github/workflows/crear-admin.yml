@@ -1,0 +1,29 @@
+name: Crear usuario admin
+
+on:
+  workflow_dispatch:
+
+jobs:
+  crear-admin:
+    runs-on: ubuntu-latest
+
+    env:
+      ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+
+    steps:
+    - name: Clonar repositorio
+      uses: actions/checkout@v3
+
+    - name: Configurar Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Instalar dependencias
+      run: |
+        pip install -r requirements.txt
+
+    - name: Crear usuario administrador
+      run: |
+        python create_admin.py
