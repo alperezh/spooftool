@@ -1,12 +1,58 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, redirect, url_for, flash, session
 import requests
 import base64
+import os
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from datetime import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
+from email_validator import validate_email, EmailNotValidError
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'clave_secreta_predeterminada')
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///dmarcdefense.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db = SQLAlchemy(app)
+login_manager = LoginManager(app)
+login_manager.login_view = 'login'
 
 API_URL = 'http://relay.dmarcd.net:5000/execute'
 API_TOKEN = '006ed549912bc9d6c43c477242b1724103caa02b'
 
+# Modelos de la base de datos
+class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128))
+    name = db.Column(db.String(100))
+    company = db.Column(db.String(100))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    emails = db.relationship('SentEmail', backref='user', lazy=True)
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+        
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+class SentEmail(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_email = db.Column(db.String(120), nullable=False)  # Correo del usuario que envió
+    sender = db.Column(db.String(120), nullable=False)  # Remitente utilizado
+    recipient = db.Column(db.String(200), nullable=False)
+    subject = db.Column(db.String(200), nullable=False)
+    body = db.Column(db.Text, nullable=False)
+    template_id = db.Column(db.String(10), nullable=True)  # ID de la plantilla usada
+    status = db.Column(db.String(20), default='sent')
+    sent_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+# Plantillas predefinidas
 TEMPLATES = {
     '1': """Asunto: Prueba de concepto de suplantación de dominio ***Company***
 
@@ -111,21 +157,97 @@ Teléfono: 1-800-HACKERS
 Correo electrónico: billing@LOOKALIKEdomain.com"""
 }
 
+# Inicializar la base de datos
+with app.app_context():
+    db.create_all()
 
+# Rutas para la autenticación
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if current_user.is_authenticated:
+        return redirect(url_for('send_email'))
+        
+    if request.method == 'POST':
+        email = request.form['email']
+        password = request.form['password']
+        name = request.form['name']
+        company = request.form['company']
+        
+        # Validar el correo electrónico
+        try:
+            valid = validate_email(email)
+            email = valid.email
+        except EmailNotValidError as e:
+            flash(f'Correo electrónico inválido: {str(e)}', 'danger')
+            return render_template('register.html')
+        
+        # Verificar si el usuario ya existe
+        existing_user = User.query.filter_by(email=email).first()
+        if existing_user:
+            flash('Este correo electrónico ya está registrado.', 'danger')
+            return render_template('register.html')
+        
+        # Crear el nuevo usuario
+        user = User(email=email, name=name, company=company)
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+        
+        flash('Registro exitoso. Ahora puedes iniciar sesión.', 'success')
+        return redirect(url_for('login'))
+        
+    return render_template('register.html')
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('send_email'))
+        
+    if request.method == 'POST':
+        email = request.form['email']
+        password = request.form['password']
+        
+        user = User.query.filter_by(email=email).first()
+        if user and user.check_password(password):
+            login_user(user, remember=True)
+            next_page = request.args.get('next')
+            flash('Has iniciado sesión correctamente.', 'success')
+            return redirect(next_page or url_for('send_email'))
+        else:
+            flash('Correo electrónico o contraseña incorrectos.', 'danger')
+    
+    return render_template('login.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    flash('Has cerrado sesión correctamente.', 'success')
+    return redirect(url_for('login'))
+
+@app.route('/profile')
+@login_required
+def profile():
+    # Obtener el historial de correos enviados por el usuario
+    emails = SentEmail.query.filter_by(user_id=current_user.id).order_by(SentEmail.sent_at.desc()).all()
+    return render_template('profile.html', emails=emails)
+
+# Ruta para la página principal, ahora protegida con login_required
 @app.route('/', methods=['GET', 'POST'])
+@login_required
 def send_email():
     if request.method == 'POST':
         sender = request.form['sender']
         subject_id = request.form['subject_id']
         recipient = request.form['recipient']
         body_text = request.form['custom_body']
+        template_id = request.form.get('body_option', 'custom')  # Obtener la plantilla seleccionada
         attachments = []
 
-        # 📎 Codificar body en Base64
+        # Codificar body en Base64
         body_base64 = base64.b64encode(body_text.encode('utf-8')).decode('utf-8')
 
-        # 📎 Procesar adjuntos si existen
+        # Procesar adjuntos si existen
         if 'attachments' in request.files:
             files = request.files.getlist('attachments')
             for file in files:
@@ -156,15 +278,66 @@ def send_email():
             print("Código de respuesta:", response.status_code)
             print("Respuesta del servidor:", response.text)
 
+            # Guardar el correo enviado en la base de datos
+            email_record = SentEmail(
+                user_id=current_user.id,
+                user_email=current_user.email,  # Guardar el correo del usuario que envió
+                sender=sender,
+                recipient=recipient,
+                subject=subject_id,
+                body=body_text,
+                template_id=template_id,
+                status='success' if response.status_code == 200 else 'error'
+            )
+            db.session.add(email_record)
+            db.session.commit()
+
             if response.status_code == 200:
                 return render_template('success.html')
             else:
                 return render_template('error.html', error_message=response.text)
         except Exception as e:
             print("Error al hacer la solicitud:", e)
+            
+            # Registrar el error
+            email_record = SentEmail(
+                user_id=current_user.id,
+                user_email=current_user.email,
+                sender=sender,
+                recipient=recipient,
+                subject=subject_id,
+                body=body_text,
+                template_id=template_id,
+                status='error'
+            )
+            db.session.add(email_record)
+            db.session.commit()
+            
             return render_template('error.html', error_message=str(e))
 
     return render_template('form.html', templates=TEMPLATES)
 
+# Ruta para el auditlog global (solo administradores)
+@app.route('/auditlog')
+@login_required
+def auditlog():
+    # Lista de correos de administradores permitidos
+    admin_emails = ['admin@dmarcdefense.com']
+    
+    # Verificar si el usuario actual es administrador
+    if current_user.email not in admin_emails:
+        flash('No tienes permisos para acceder a esta página', 'danger')
+        return redirect(url_for('send_email'))
+    
+    # Obtener todos los correos enviados por todos los usuarios
+    all_emails = SentEmail.query.order_by(SentEmail.sent_at.desc()).all()
+    
+    # Obtener todos los usuarios para mostrar sus nombres
+    users = User.query.all()
+    user_dict = {user.id: user for user in users}
+    
+    return render_template('auditlog.html', emails=all_emails, users=user_dict, templates=TEMPLATES)
+
+# Punto de entrada
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000, debug=True)

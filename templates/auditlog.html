@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Registro de Auditoría Global - DMARCDefense</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+  <style>
+    .table-responsive {
+      max-height: 700px;
+      overflow-y: auto;
+    }
+    th {
+      position: sticky;
+      top: 0;
+      background-color: #f8f9fa;
+      z-index: 1;
+    }
+  </style>
+</head>
+<body class="bg-light">
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <div class="container">
+    <a class="navbar-brand" href="{{ url_for('send_email') }}">DMARCDefense</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav me-auto">
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('send_email') }}">Enviar Correo</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('profile') }}">Mi Perfil</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link active" href="{{ url_for('auditlog') }}">Registro Global</a>
+        </li>
+      </ul>
+      <ul class="navbar-nav">
+        <li class="nav-item">
+          <span class="nav-link">{{ current_user.email }} (Admin)</span>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('logout') }}">Cerrar Sesión</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="container-fluid py-4">
+  <div class="row mb-4">
+    <div class="col">
+      <h2 class="mb-3"><i class="bi bi-shield-lock"></i> Registro de Auditoría Global</h2>
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+              <h5 class="mb-0">Todos los correos enviados</h5>
+              <p class="text-muted small mb-0">Total: {{ emails|length }} registros</p>
+            </div>
+            <div class="input-group w-50">
+              <input type="text" id="searchInput" class="form-control" placeholder="Buscar...">
+              <button class="btn btn-outline-secondary" type="button" id="exportBtn">
+                <i class="bi bi-download"></i> Exportar CSV
+              </button>
+            </div>
+          </div>
+          
+          <div class="table-responsive">
+            <table class="table table-striped table-hover" id="auditTable">
+              <thead class="bg-light">
+                <tr>
+                  <th>ID</th>
+                  <th>Fecha y Hora</th>
+                  <th>Usuario</th>
+                  <th>Remitente</th>
+                  <th>Destinatario</th>
+                  <th>Asunto</th>
+                  <th>Plantilla</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for email in emails %}
+                <tr>
+                  <td>{{ email.id }}</td>
+                  <td>{{ email.sent_at.strftime('%d/%m/%Y %H:%M:%S') }}</td>
+                  <td>{{ email.user_email }}</td>
+                  <td>{{ email.sender }}</td>
+                  <td>{{ email.recipient }}</td>
+                  <td>{{ email.subject }}</td>
+                  <td>
+                    {% if email.template_id and email.template_id != 'custom' %}
+                      Plantilla {{ email.template_id }}
+                    {% else %}
+                      Personalizado
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if email.status == 'success' %}
+                      <span class="badge bg-success">Enviado</span>
+                    {% else %}
+                      <span class="badge bg-danger">Error</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <button type="button" class="btn btn-sm btn-info view-btn" 
+                            data-id="{{ email.id }}" 
+                            data-user="{{ email.user_email }}"
+                            data-sender="{{ email.sender }}"
+                            data-recipient="{{ email.recipient }}"
+                            data-subject="{{ email.subject }}"
+                            data-body="{{ email.body|replace('\n', '\\n')|replace('"', '\\"') }}"
+                            data-template="{{ email.template_id }}">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para ver detalles del email -->
+<div class="modal fade" id="emailModal" tabindex="-1" aria-labelledby="emailModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="emailModalLabel">Detalles del Correo</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <div class="row">
+            <div class="col-md-6">
+              <p><strong>ID:</strong> <span id="modal-id"></span></p>
+              <p><strong>Usuario:</strong> <span id="modal-user"></span></p>
+              <p><strong>Remitente:</strong> <span id="modal-sender"></span></p>
+              <p><strong>Destinatario:</strong> <span id="modal-recipient"></span></p>
+            </div>
+            <div class="col-md-6">
+              <p><strong>Asunto:</strong> <span id="modal-subject"></span></p>
+              <p><strong>Plantilla:</strong> <span id="modal-template"></span></p>
+              <p><strong>Fecha:</strong> <span id="modal-date"></span></p>
+            </div>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label"><strong>Cuerpo del correo:</strong></label>
+          <div class="card">
+            <div class="card-body">
+              <pre id="modal-body" style="white-space: pre-wrap;"></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  // Funcionamiento del buscador
+  document.getElementById('searchInput').addEventListener('keyup', function() {
+    const searchValue = this.value.toLowerCase();
+    const table = document.getElementById('auditTable');
+    const rows = table.getElementsByTagName('tr');
+    
+    for (let i = 1; i < rows.length; i++) {
+      let found = false;
+      const cells = rows[i].getElementsByTagName('td');
+      
+      for (let j = 0; j < cells.length; j++) {
+        const cellText = cells[j].textContent || cells[j].innerText;
+        
+        if (cellText.toLowerCase().indexOf(searchValue) > -1) {
+          found = true;
+          break;
+        }
+      }
+      
+      if (found) {
+        rows[i].style.display = '';
+      } else {
+        rows[i].style.display = 'none';
+      }
+    }
+  });
+  
+  // Manejo del modal para ver detalles
+  document.querySelectorAll('.view-btn').forEach(button => {
+    button.addEventListener('click', function() {
+      const id = this.getAttribute('data-id');
+      const user = this.getAttribute('data-user');
+      const sender = this.getAttribute('data-sender');
+      const recipient = this.getAttribute('data-recipient');
+      const subject = this.getAttribute('data-subject');
+      const body = this.getAttribute('data-body').replace(/\\n/g, '\n');
+      const template = this.getAttribute('data-template');
+      
+      document.getElementById('modal-id').textContent = id;
+      document.getElementById('modal-user').textContent = user;
+      document.getElementById('modal-sender').textContent = sender;
+      document.getElementById('modal-recipient').textContent = recipient;
+      document.getElementById('modal-subject').textContent = subject;
+      document.getElementById('modal-body').textContent = body;
+      
+      const templateDisplay = template === 'custom' ? 'Personalizado' : `Plantilla ${template}`;
+      document.getElementById('modal-template').textContent = templateDisplay;
+      
+      const row = this.closest('tr');
+      const date = row.cells[1].textContent;
+      document.getElementById('modal-date').textContent = date;
+      
+      const modal = new bootstrap.Modal(document.getElementById('emailModal'));
+      modal.show();
+    });
+  });
+  
+  // Exportar a CSV
+  document.getElementById('exportBtn').addEventListener('click', function() {
+    const table = document.getElementById('auditTable');
+    let csv = [];
+    const rows = table.querySelectorAll('tr');
+    
+    for (let i = 0; i < rows.length; i++) {
+      const row = [], cols = rows[i].querySelectorAll('td, th');
+      
+      for (let j = 0; j < cols.length - 1; j++) { // Excluir columna de acciones
+        let text = cols[j].innerText;
+        // Limpiar el texto
+        text = text.replace(/(\r\n|\n|\r)/gm, ' ').replace(/"/g, '""');
+        // Encerrar en comillas si contiene coma o comillas
+        if (text.includes(',') || text.includes('"')) {
+          text = '"' + text + '"';
+        }
+        row.push(text);
+      }
+      csv.push(row.join(','));
+    }
+    
+    const csvContent = "data:text/csv;charset=utf-8," + csv.join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', 'auditlog_dmarcdefense_' + new Date().toISOString().substring(0, 10) + '.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  });
+</script>
+
+</body>
+</html>

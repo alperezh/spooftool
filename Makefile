@@ -16,7 +16,9 @@ check-templates:
 
 up: check-templates
 	docker-compose up --build -d
-
+	@echo "Esperando a que la aplicación esté lista..."
+	@sleep 5
+	docker exec -it $(APP_NAME) python create_admin.py
 down:
 	docker-compose down
 
@@ -24,6 +26,9 @@ rebuild:
 	docker-compose down
 	docker-compose build
 	docker-compose up -d
+	@echo "Esperando a que la aplicación esté lista..."
+	@sleep 5
+	docker exec -it $(APP_NAME) python create_admin.py
 
 logs:
 	docker logs -f $(APP_NAME)
