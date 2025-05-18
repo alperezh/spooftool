@@ -13,7 +13,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y curl && apt-get clean
 
 # Copiar requirements primero (aprovechar cache de Docker)
-COPY requirements.txt .
+COPY app/requirements.txt .
 
 # Instalar paquetes Python necesarios
 RUN pip install --no-cache-dir -r requirements.txt
