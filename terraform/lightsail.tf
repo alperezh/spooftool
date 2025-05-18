@@ -15,35 +15,32 @@ resource "aws_lightsail_certificate" "dmarcdefense" {
   subject_alternative_names = ["www.${var.domain_name}"]
 }
 
-# Servicio de contenedor Lightsail
+# Servicio de contenedor Lightsail - Configuración básica
 resource "aws_lightsail_container_service" "dmarcdefense" {
   name  = "dmarcdefense"
   power = var.lightsail_power
   scale = var.lightsail_scale
-
-  # Importante: Omitir los bloques private_registry_access y public_domain_names 
-  # que están causando errores. Estos se configurarán después del aprovisionamiento
-  # inicial del recurso o a través de la consola AWS.
 }
 
-# Despliegue del servicio de contenedor
+# Despliegue del servicio de contenedor - Configuración simplificada
 resource "aws_lightsail_container_service_deployment_version" "dmarcdefense" {
   service_name = aws_lightsail_container_service.dmarcdefense.name
 
   container {
     container_name = "dmarcdefense"
-    # Usar una imagen estándar inicialmente, luego actualizar a la de ECR
+    # Usar una imagen estándar inicialmente
     image          = "amazon/amazon-linux-2" 
-
-    environment {
+    
+    # Environment como mapa, no como bloque
+    environment = {
       API_URL    = var.api_url
       API_TOKEN  = var.api_token
       SECRET_KEY = var.secret_key
     }
-
-    ports {
-      port     = 8000
-      protocol = "HTTP"
+    
+    # Ports como mapa, no como bloque
+    ports = {
+      "8000" = "HTTP"
     }
   }
 
@@ -54,9 +51,7 @@ resource "aws_lightsail_container_service_deployment_version" "dmarcdefense" {
       path          = "/login"
       success_codes = "200-299"
     }
-    
-    # Configuración HTTPS
-    https_redirection = true
+    # Eliminado https_redirection que estaba causando problemas
   }
 }
 
