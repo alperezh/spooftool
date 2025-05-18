@@ -1,7 +1,7 @@
 resource "aws_cloudfront_distribution" "dmarcdefense" {
   origin {
-    # Eliminar protocolo de la URL y usar solo el dominio
-    # Usando substring para quitar "https://" si está presente
+    # Extraer solo el nombre de dominio de la URL de Lightsail, sin el protocolo
+    # La función replace elimina "https://" del inicio de la URL
     domain_name = replace(aws_lightsail_container_service.dmarcdefense.url, "/^https?:\\/\\//", "")
     origin_id   = "lightsail"
 
@@ -51,4 +51,20 @@ resource "aws_cloudfront_distribution" "dmarcdefense" {
       restriction_type = "none"
     }
   }
+}
+
+# Output para verificar la URL y dominio
+output "lightsail_url_raw" {
+  value = aws_lightsail_container_service.dmarcdefense.url
+  description = "URL sin procesar del servicio Lightsail"
+}
+
+output "lightsail_domain_extracted" {
+  value = replace(aws_lightsail_container_service.dmarcdefense.url, "/^https?:\\/\\//", "")
+  description = "Dominio extraído de la URL de Lightsail (sin protocolo)"
+}
+
+output "cloudfront_domain" {
+  value = aws_cloudfront_distribution.dmarcdefense.domain_name
+  description = "Dominio de CloudFront"
 }

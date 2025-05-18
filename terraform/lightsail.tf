@@ -15,47 +15,40 @@ resource "aws_lightsail_certificate" "dmarcdefense" {
   subject_alternative_names = ["www.${var.domain_name}"]
 }
 
-# Servicio de contenedor Lightsail - Configuración básica
+# Servicio de contenedor Lightsail
 resource "aws_lightsail_container_service" "dmarcdefense" {
   name  = "dmarcdefense"
   power = var.lightsail_power
   scale = var.lightsail_scale
 }
 
-# Despliegue del servicio de contenedor - Configuración simplificada
+# Despliegue del servicio - Configuración mínima con la imagen oficial de nginx
 resource "aws_lightsail_container_service_deployment_version" "dmarcdefense" {
   service_name = aws_lightsail_container_service.dmarcdefense.name
 
   container {
     container_name = "dmarcdefense"
-    # Usar una imagen estándar inicialmente
-    image          = "amazon/amazon-linux-2" 
+    # Usar la imagen oficial de nginx, que sabemos funcionará
+    image          = "nginx:alpine"
     
-    # Environment como mapa, no como bloque
-    environment = {
-      API_URL    = var.api_url
-      API_TOKEN  = var.api_token
-      SECRET_KEY = var.secret_key
-    }
-    
-    # Ports como mapa, no como bloque
+    # Configuración mínima sin variables de entorno
     ports = {
-      "8000" = "HTTP"
+      "80" = "HTTP"
     }
   }
 
   public_endpoint {
     container_name = "dmarcdefense"
-    container_port = 8000
+    container_port = 80
     health_check {
-      path          = "/login"
-      success_codes = "200-299"
+      # Usar una ruta de health check simple para nginx
+      path          = "/"
+      success_codes = "200"
     }
-    # Eliminado https_redirection que estaba causando problemas
   }
 }
 
-# Salidas relevantes
+# Salidas para facilitar la gestión
 output "lightsail_service_url" {
   value = aws_lightsail_container_service.dmarcdefense.url
 }
