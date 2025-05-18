@@ -13,16 +13,19 @@ resource "aws_lightsail_container_service" "dmarcdefense" {
   power = var.lightsail_power
   scale = var.lightsail_scale
 
-  # Corregir el bloque de acceso al registro privado
+  # Configuración correcta de acceso a ECR
   private_registry_access {
-    ecr_repository_names = [aws_ecr_repository.dmarcdefense.name]
+    # En la API de AWS Lightsail, es una sola cadena para el nombre del repositorio
+    ecr_repository_name = aws_ecr_repository.dmarcdefense.name
   }
 
-  # Corregir la configuración de nombres de dominio
+  # Configuración correcta para dominio públicos
   public_domain_names {
+    # La estructura para public_domain_names es diferente
+    # El mapeo correcto es domain_names dentro del bloque certificate
+    domain_names = [var.domain_name, "www.${var.domain_name}"]
     certificate {
       certificate_name = aws_lightsail_certificate.dmarcdefense.name
-      domain_names     = [var.domain_name, "www.${var.domain_name}"]
     }
   }
 }
@@ -59,7 +62,7 @@ resource "aws_lightsail_container_service_deployment_version" "dmarcdefense" {
       path          = "/login"
       success_codes = "200-299"
     }
-
+    
     # Configuración HTTPS
     https_redirection = true
   }
