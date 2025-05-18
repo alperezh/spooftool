@@ -53,3 +53,8 @@ variable "zone_id" {
   type        = string
   default     = ""
 }
+
+variable "domain_name" {
+  description = "Nombre de dominio para la aplicación DMARCDefense (ej: spoofingtool.dmarcdefense.net)"
+  type        = string
+}
