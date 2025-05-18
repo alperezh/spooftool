@@ -1,8 +1,9 @@
-version: '3.8'
 
 services:
   dmarcdefense-app:
-    build: .
+    build:
+      context: ..  # Apunta al directorio raíz del proyecto
+      dockerfile: docker/Dockerfile  # Ruta al Dockerfile relativa al contexto
     container_name: dmarcdefensespoofingtool-dmarcdefense-app-1
     ports:
       - "8000:8000"
@@ -12,7 +13,7 @@ services:
       - API_URL=${API_URL}
       - API_TOKEN=${API_TOKEN}
     volumes:
-      - ./instance:/app/instance
+      - ../instance:/app/instance  # Ajusta la ruta para que sea relativa al directorio raíz
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/login"]
       interval: 30s

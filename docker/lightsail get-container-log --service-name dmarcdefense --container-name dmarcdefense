@@ -1,0 +1,91 @@
+{
+    "containerServices": [
+        {
+            "containerServiceName": "dmarcdefense",
+            "arn": "arn:aws:lightsail:us-east-1:084375562608:ContainerService/deb9501d-807b-467c-bc2f-1dd5b8264f34",
+            "createdAt": "2025-05-19T00:10:51+02:00",
+            "location": {
+                "availabilityZone": "all",
+                "regionName": "us-east-1"
+            },
+            "resourceType": "ContainerService",
+            "tags": [],
+            "power": "micro",
+            "powerId": "micro-1",
+            "state": "DEPLOYING",
+            "stateDetail": {
+                "code": "CREATING_DEPLOYMENT",
+                "message": ""
+            },
+            "scale": 1,
+            "currentDeployment": {
+                "version": 3,
+                "state": "ACTIVE",
+                "containers": {
+                    "dmarcdefense": {
+                        "image": "nginx:alpine",
+                        "command": [],
+                        "environment": {},
+                        "ports": {
+                            "80": "HTTP"
+                        }
+                    }
+                },
+                "publicEndpoint": {
+                    "containerName": "dmarcdefense",
+                    "containerPort": 80,
+                    "healthCheck": {
+                        "healthyThreshold": 2,
+                        "unhealthyThreshold": 2,
+                        "timeoutSeconds": 2,
+                        "intervalSeconds": 5,
+                        "path": "/",
+                        "successCodes": "200"
+                    }
+                },
+                "createdAt": "2025-05-19T00:40:38+02:00"
+            },
+            "nextDeployment": {
+                "version": 4,
+                "state": "ACTIVATING",
+                "containers": {
+                    "dmarcdefense": {
+                        "image": "084375562608.dkr.ecr.us-east-1.amazonaws.com/dmarcdefense:1f753c360af72edf37120a4d3ec0c7fc374bb3f9",
+                        "command": [],
+                        "environment": {
+                            "API_TOKEN": "006ed549912bc9d6c43c477242b1724103caa02b",
+                            "API_URL": "http://relay.dmarcd.net:5000/execute",
+                            "SECRET_KEY": "clave_secreta_desarrollo_local"
+                        },
+                        "ports": {
+                            "8000": "HTTP"
+                        }
+                    }
+                },
+                "publicEndpoint": {
+                    "containerName": "dmarcdefense",
+                    "containerPort": 8000,
+                    "healthCheck": {
+                        "healthyThreshold": 2,
+                        "unhealthyThreshold": 2,
+                        "timeoutSeconds": 2,
+                        "intervalSeconds": 5,
+                        "path": "/login",
+                        "successCodes": "200-499"
+                    }
+                },
+                "createdAt": "2025-05-19T01:18:58+02:00"
+            },
+            "isDisabled": false,
+            "principalArn": "arn:aws:iam::867344438150:role/amazon/lightsail/us-east-1/containers/dmarcdefense/iq5v75i5hq8gvmq9ff910tkrd0h0qhtkht11uq8a9vfid81u3h60",
+            "privateDomainName": "dmarcdefense.service.local",
+            "url": "https://dmarcdefense.mp6q91hcmz3jp.us-east-1.cs.amazonlightsail.com/",
+            "privateRegistryAccess": {
+                "ecrImagePullerRole": {
+                    "isActive": false,
+                    "principalArn": ""
+                }
+            }
+        }
+    ]
+}

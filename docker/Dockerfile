@@ -1,5 +1,4 @@
-# Dockerfile - Versión producción optimizada
-
+# Dockerfile para DMARCDefense
 FROM python:3.11-slim
 
 # Variables de entorno para no generar archivos .pyc ni buffering
@@ -12,14 +11,18 @@ WORKDIR /app
 # Instalar dependencias básicas
 RUN apt-get update && apt-get install -y curl && apt-get clean
 
-# Copiar requirements primero (aprovechar cache de Docker)
+# Copiar requirements.txt desde el directorio padre
+# Nota el ../ que indica subir un nivel
 COPY app/requirements.txt .
 
 # Instalar paquetes Python necesarios
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiar todo el código de la app
-COPY . .
+COPY app/ .
+
+# Crear el directorio para la base de datos
+RUN mkdir -p instance && chmod -R 777 instance
 
 # Exponer el puerto en el que corre Flask
 EXPOSE 8000

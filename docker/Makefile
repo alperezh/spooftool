@@ -1,7 +1,7 @@
 # Makefile para controlar la app de DMARCDefense Spoofing Tool
 
 APP_NAME=dmarcdefensespoofingtool-dmarcdefense-app-1
-TEMPLATES_DIR=templates
+TEMPLATES_DIR=../app/templates
 REQUIRED_TEMPLATES=form.html success.html error.html login.html register.html profile.html auditlog.html
 
 check-templates:
