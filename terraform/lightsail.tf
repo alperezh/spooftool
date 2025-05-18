@@ -47,5 +47,8 @@ resource "aws_lightsail_container_service_deployment_version" "dmarcdefense" {
       path          = "/login"
       success_codes = "200-299"
     }
+
+    # Configuración HTTPS
+    https_redirection = true
   }
 }

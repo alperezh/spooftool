@@ -39,7 +39,7 @@ resource "aws_cloudfront_distribution" "dmarcdefense" {
   web_acl_id = aws_wafv2_web_acl.dmarcdefense.arn
 
   viewer_certificate {
-    acm_certificate_arn      = aws_acm_certificate.dmarcdefense.arn
+    acm_certificate_arn      = aws_acm_certificate_validation.dmarcdefense.certificate_arn
     ssl_support_method       = "sni-only"
     minimum_protocol_version = "TLSv1.2_2021"
   }
