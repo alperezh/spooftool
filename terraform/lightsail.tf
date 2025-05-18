@@ -1,16 +1,28 @@
+# Definir primero el repositorio ECR
+resource "aws_ecr_repository" "dmarcdefense" {
+  name                 = "dmarcdefense"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+}
+
 resource "aws_lightsail_container_service" "dmarcdefense" {
   name  = "dmarcdefense"
   power = var.lightsail_power
   scale = var.lightsail_scale
 
+  # Corregir el bloque de acceso al registro privado
   private_registry_access {
-    ecr_repository_name = aws_ecr_repository.dmarcdefense.name
+    ecr_repository_names = [aws_ecr_repository.dmarcdefense.name]
   }
 
+  # Corregir la configuración de nombres de dominio
   public_domain_names {
-    domain_names = [var.domain_name]
     certificate {
       certificate_name = aws_lightsail_certificate.dmarcdefense.name
+      domain_names     = [var.domain_name, "www.${var.domain_name}"]
     }
   }
 }

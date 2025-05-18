@@ -9,11 +9,11 @@ resource "local_file" "backup_script" {
 S3_BUCKET="${aws_s3_bucket.backups.id}"
 DB_PATH="/app/instance/dmarcdefense.db"
 BACKUP_DIR="/tmp/backups"
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-WEEKDAY=$(date +%u)
-DAY_OF_MONTH=$(date +%d)
-BACKUP_NAME="dmarcdefense_$TIMESTAMP.db"
-LOG_FILE="$BACKUP_DIR/backup_log.txt"
+TIMESTAMP=$$(date +%Y%m%d_%H%M%S)
+WEEKDAY=$$(date +%u)
+DAY_OF_MONTH=$$(date +%d)
+BACKUP_NAME="dmarcdefense_$$TIMESTAMP.db"
+LOG_FILE="$$BACKUP_DIR/backup_log.txt"
 
 # Crear directorio de backup
 mkdir -p $BACKUP_DIR
@@ -91,61 +91,61 @@ resource "local_file" "restore_script" {
 S3_BUCKET="${aws_s3_bucket.backups.id}"
 DB_PATH="/app/instance/dmarcdefense.db"
 BACKUP_DIR="/tmp/backups"
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+TIMESTAMP=$$(date +%Y%m%d_%H%M%S)
 
 # Verificar parámetros
-if [ $# -lt 1 ]; then
-  echo "Uso: $0 nombre_del_backup"
-  echo "Ejemplo: $0 daily/20250120_dmarcdefense_20250120_030000.db.gz"
+if [ $$# -lt 1 ]; then
+  echo "Uso: $$0 nombre_del_backup"
+  echo "Ejemplo: $$0 daily/20250120_dmarcdefense_20250120_030000.db.gz"
   
   # Listar backups disponibles
   echo "Backups diarios disponibles:"
-  aws s3 ls "s3://$S3_BUCKET/daily/" | sort
+  aws s3 ls "s3://$$S3_BUCKET/daily/" | sort
   
   echo "Backups semanales disponibles:"
-  aws s3 ls "s3://$S3_BUCKET/weekly/" | sort
+  aws s3 ls "s3://$$S3_BUCKET/weekly/" | sort
   
   echo "Backups mensuales disponibles:"
-  aws s3 ls "s3://$S3_BUCKET/monthly/" | sort
+  aws s3 ls "s3://$$S3_BUCKET/monthly/" | sort
   
   exit 1
 fi
 
-BACKUP_KEY="$1"
-RESTORE_DIR="$BACKUP_DIR/restore_$TIMESTAMP"
-BACKUP_FILE=$(basename "$BACKUP_KEY")
-RESTORE_FILE="$RESTORE_DIR/dmarcdefense.db"
+BACKUP_KEY="$$1"
+RESTORE_DIR="$$BACKUP_DIR/restore_$$TIMESTAMP"
+BACKUP_FILE=$$(basename "$$BACKUP_KEY")
+RESTORE_FILE="$$RESTORE_DIR/dmarcdefense.db"
 
 # Crear directorio de restauración
-mkdir -p "$RESTORE_DIR"
+mkdir -p "$$RESTORE_DIR"
 
 # Descargar backup de S3
-echo "Descargando backup desde S3: $BACKUP_KEY"
-aws s3 cp "s3://$S3_BUCKET/$BACKUP_KEY" "$RESTORE_DIR/$BACKUP_FILE"
+echo "Descargando backup desde S3: $$BACKUP_KEY"
+aws s3 cp "s3://$$S3_BUCKET/$$BACKUP_KEY" "$$RESTORE_DIR/$$BACKUP_FILE"
 
-if [ $? -ne 0 ]; then
+if [ $$? -ne 0 ]; then
   echo "Error: No se pudo descargar el backup desde S3"
   exit 1
 fi
 
 # Descomprimir backup
 echo "Descomprimiendo backup..."
-gunzip -f "$RESTORE_DIR/$BACKUP_FILE"
-UNCOMPRESSED_FILE="${RESTORE_DIR}/$(basename "$BACKUP_FILE" .gz)"
+gunzip -f "$$RESTORE_DIR/$$BACKUP_FILE"
+UNCOMPRESSED_FILE="$${RESTORE_DIR}/$$(basename "$$BACKUP_FILE" .gz)"
 
-if [ ! -f "$UNCOMPRESSED_FILE" ]; then
+if [ ! -f "$$UNCOMPRESSED_FILE" ]; then
   echo "Error: Falló la descompresión del backup"
   exit 1
 fi
 
 # Verificar integridad
 echo "Verificando integridad del backup..."
-INTEGRITY=$(sqlite3 "$UNCOMPRESSED_FILE" "PRAGMA integrity_check;")
+INTEGRITY=$$(sqlite3 "$$UNCOMPRESSED_FILE" "PRAGMA integrity_check;")
 
-if [ "$INTEGRITY" != "ok" ]; then
+if [ "$$INTEGRITY" != "ok" ]; then
   echo "ADVERTENCIA: Posibles problemas de integridad en el backup"
   read -p "¿Desea continuar con la restauración? (s/n): " CONTINUE
-  if [ "$CONTINUE" != "s" ]; then
+  if [ "$$CONTINUE" != "s" ]; then
     echo "Restauración cancelada por el usuario"
     exit 1
   fi
@@ -153,8 +153,9 @@ fi
 
 # Hacer backup de la BD actual
 echo "Haciendo backup de la base de datos actual..."
-CURRENT_BACKUP="${BACKUP_DIR}/pre_restore_${TIMESTAMP}.db"
-sqlite3 "$DB_PATH" ".backup '$CURRENT_BACKUP'"
+CURRENT_BACKUP="$${BACKUP_DIR}/pre_restore_$${TIMESTAMP}.db"
+sqlite3 "$$DB_PATH" ".backup '$$CURRENT_BACKUP'"
+
 
 # Detener el servicio
 echo "Deteniendo el servicio para la restauración..."
