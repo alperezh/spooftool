@@ -1,6 +1,8 @@
 resource "aws_cloudfront_distribution" "dmarcdefense" {
   origin {
-    domain_name = aws_lightsail_container_service.dmarcdefense.url
+    # Eliminar protocolo de la URL y usar solo el dominio
+    # Usando substring para quitar "https://" si está presente
+    domain_name = replace(aws_lightsail_container_service.dmarcdefense.url, "/^https?:\\/\\//", "")
     origin_id   = "lightsail"
 
     custom_origin_config {
