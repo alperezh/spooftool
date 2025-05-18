@@ -1,5 +1,3 @@
-# backup-scripts.tf
-
 resource "local_file" "backup_script" {
   filename = "${path.module}/scripts/backup.sh"
   content  = <<-EOT
@@ -16,67 +14,67 @@ BACKUP_NAME="dmarcdefense_$$TIMESTAMP.db"
 LOG_FILE="$$BACKUP_DIR/backup_log.txt"
 
 # Crear directorio de backup
-mkdir -p $BACKUP_DIR
-echo "Iniciando backup: $TIMESTAMP" >> $LOG_FILE
+mkdir -p $$BACKUP_DIR
+echo "Iniciando backup: $$TIMESTAMP" >> $$LOG_FILE
 
 # Comprobar si se puede acceder a la base de datos
-if [ ! -f "$DB_PATH" ]; then
-  echo "Error: Base de datos no encontrada en $DB_PATH" >> $LOG_FILE
+if [ ! -f "$$DB_PATH" ]; then
+  echo "Error: Base de datos no encontrada en $$DB_PATH" >> $$LOG_FILE
   exit 1
 fi
 
 # Verificar si la base de datos está en uso
-echo "Verificando que la base de datos no esté bloqueada..." >> $LOG_FILE
-sqlite3 $DB_PATH "PRAGMA busy_timeout = 5000; PRAGMA journal_mode;"
+echo "Verificando que la base de datos no esté bloqueada..." >> $$LOG_FILE
+sqlite3 $$DB_PATH "PRAGMA busy_timeout = 5000; PRAGMA journal_mode;"
 
 # Crear respaldo usando sqlite3
-echo "Creando backup usando sqlite3..." >> $LOG_FILE
-DB_SIZE=$(du -h "$DB_PATH" | cut -f1)
-echo "Tamaño de base de datos: $DB_SIZE" >> $LOG_FILE
+echo "Creando backup usando sqlite3..." >> $$LOG_FILE
+DB_SIZE=$$(du -h "$$DB_PATH" | cut -f1)
+echo "Tamaño de base de datos: $$DB_SIZE" >> $$LOG_FILE
 
-sqlite3 $DB_PATH ".backup '$BACKUP_DIR/$BACKUP_NAME'"
-if [ $? -ne 0 ]; then
-  echo "Error al crear backup de la BD" >> $LOG_FILE
+sqlite3 $$DB_PATH ".backup '$$BACKUP_DIR/$$BACKUP_NAME'"
+if [ $$? -ne 0 ]; then
+  echo "Error al crear backup de la BD" >> $$LOG_FILE
   exit 1
 fi
 
 # Comprimir el backup
-echo "Comprimiendo backup..." >> $LOG_FILE
-gzip -f "$BACKUP_DIR/$BACKUP_NAME"
-BACKUP_FILE="$BACKUP_DIR/$BACKUP_NAME.gz"
+echo "Comprimiendo backup..." >> $$LOG_FILE
+gzip -f "$$BACKUP_DIR/$$BACKUP_NAME"
+BACKUP_FILE="$$BACKUP_DIR/$$BACKUP_NAME.gz"
 
 # Verificar integridad
-echo "Verificando integridad de la base de datos..." >> $LOG_FILE
-INTEGRITY=$(sqlite3 $DB_PATH "PRAGMA integrity_check;")
-echo "Resultado integridad: $INTEGRITY" >> $LOG_FILE
+echo "Verificando integridad de la base de datos..." >> $$LOG_FILE
+INTEGRITY=$$(sqlite3 $$DB_PATH "PRAGMA integrity_check;")
+echo "Resultado integridad: $$INTEGRITY" >> $$LOG_FILE
 
-if [ "$INTEGRITY" != "ok" ]; then
-  echo "ADVERTENCIA: La base de datos podría tener problemas de integridad" >> $LOG_FILE
+if [ "$$INTEGRITY" != "ok" ]; then
+  echo "ADVERTENCIA: La base de datos podría tener problemas de integridad" >> $$LOG_FILE
 fi
 
 # Subir a S3
-echo "Subiendo backup a S3..." >> $LOG_FILE
+echo "Subiendo backup a S3..." >> $$LOG_FILE
 
 # Backup diario
-aws s3 cp "$BACKUP_FILE" "s3://$S3_BUCKET/daily/$(date +%Y%m%d)_$BACKUP_NAME.gz"
+aws s3 cp "$$BACKUP_FILE" "s3://$$S3_BUCKET/daily/$$(date +%Y%m%d)_$$BACKUP_NAME.gz"
 
 # Backup semanal (lunes = 1)
-if [ "$WEEKDAY" -eq "1" ]; then
-  echo "Creando backup semanal..." >> $LOG_FILE
-  aws s3 cp "$BACKUP_FILE" "s3://$S3_BUCKET/weekly/$(date +%Y%m%d)_$BACKUP_NAME.gz"
+if [ "$$WEEKDAY" -eq "1" ]; then
+  echo "Creando backup semanal..." >> $$LOG_FILE
+  aws s3 cp "$$BACKUP_FILE" "s3://$$S3_BUCKET/weekly/$$(date +%Y%m%d)_$$BACKUP_NAME.gz"
 fi
 
 # Backup mensual (día 1 del mes)
-if [ "$DAY_OF_MONTH" -eq "01" ]; then
-  echo "Creando backup mensual..." >> $LOG_FILE
-  aws s3 cp "$BACKUP_FILE" "s3://$S3_BUCKET/monthly/$(date +%Y%m)_$BACKUP_NAME.gz"
+if [ "$$DAY_OF_MONTH" -eq "01" ]; then
+  echo "Creando backup mensual..." >> $$LOG_FILE
+  aws s3 cp "$$BACKUP_FILE" "s3://$$S3_BUCKET/monthly/$$(date +%Y%m)_$$BACKUP_NAME.gz"
 fi
 
 # Limpiar archivos temporales
-rm -f "$BACKUP_FILE"
-echo "Backup completado con éxito: $TIMESTAMP" >> $LOG_FILE
-echo "Log de backup:" >> $LOG_FILE
-cat $LOG_FILE
+rm -f "$$BACKUP_FILE"
+echo "Backup completado con éxito: $$TIMESTAMP" >> $$LOG_FILE
+echo "Log de backup:" >> $$LOG_FILE
+cat $$LOG_FILE
 
 exit 0
 EOT
@@ -156,7 +154,6 @@ echo "Haciendo backup de la base de datos actual..."
 CURRENT_BACKUP="$${BACKUP_DIR}/pre_restore_$${TIMESTAMP}.db"
 sqlite3 "$$DB_PATH" ".backup '$$CURRENT_BACKUP'"
 
-
 # Detener el servicio
 echo "Deteniendo el servicio para la restauración..."
 # Comando para detener el servicio, ajustar según sistema
@@ -164,9 +161,9 @@ systemctl stop dmarcdefense || docker stop dmarcdefense || echo "ADVERTENCIA: No
 
 # Restaurar la base de datos
 echo "Restaurando la base de datos..."
-cp "$UNCOMPRESSED_FILE" "$DB_PATH"
-chown -R www-data:www-data "$DB_PATH" || echo "Advertencia: No se pudo cambiar propietario del archivo"
-chmod 644 "$DB_PATH"
+cp "$$UNCOMPRESSED_FILE" "$$DB_PATH"
+chown -R www-data:www-data "$$DB_PATH" || echo "Advertencia: No se pudo cambiar propietario del archivo"
+chmod 644 "$$DB_PATH"
 
 # Iniciar el servicio
 echo "Iniciando el servicio..."
@@ -174,27 +171,27 @@ echo "Iniciando el servicio..."
 systemctl start dmarcdefense || docker start dmarcdefense || echo "ADVERTENCIA: No se pudo iniciar el servicio"
 
 echo "Restauración completada con éxito"
-echo "Backup previo guardado en: $CURRENT_BACKUP"
-echo "Se restableció la base de datos desde: $BACKUP_KEY"
+echo "Backup previo guardado en: $$CURRENT_BACKUP"
+echo "Se restableció la base de datos desde: $$BACKUP_KEY"
 
 # Limpiar archivos temporales
-rm -rf "$RESTORE_DIR"
+rm -rf "$$RESTORE_DIR"
 
 exit 0
 EOT
 }
 
-# Subir scripts a S3 para que estén disponibles
+# Modificar la carga de los scripts a S3 para evitar el error filemd5
 resource "aws_s3_object" "backup_script" {
-  bucket = aws_s3_bucket.backups.id
-  key    = "scripts/backup.sh"
-  source = local_file.backup_script.filename
-  etag   = filemd5(local_file.backup_script.filename)
+  bucket  = aws_s3_bucket.backups.id
+  key     = "scripts/backup.sh"
+  content = local_file.backup_script.content  # Usar content en lugar de source
+  etag    = md5(local_file.backup_script.content)  # Calcular MD5 del contenido, no del archivo
 }
 
 resource "aws_s3_object" "restore_script" {
-  bucket = aws_s3_bucket.backups.id
-  key    = "scripts/restore.sh"
-  source = local_file.restore_script.filename
-  etag   = filemd5(local_file.restore_script.filename)
+  bucket  = aws_s3_bucket.backups.id
+  key     = "scripts/restore.sh"
+  content = local_file.restore_script.content  # Usar content en lugar de source
+  etag    = md5(local_file.restore_script.content)  # Calcular MD5 del contenido, no del archivo
 }
