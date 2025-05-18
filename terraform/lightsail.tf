@@ -1,4 +1,4 @@
-# Definir primero el repositorio ECR
+# Definir el repositorio ECR
 resource "aws_ecr_repository" "dmarcdefense" {
   name                 = "dmarcdefense"
   image_tag_mutability = "MUTABLE"
@@ -8,40 +8,32 @@ resource "aws_ecr_repository" "dmarcdefense" {
   }
 }
 
-resource "aws_lightsail_container_service" "dmarcdefense" {
-  name  = "dmarcdefense"
-  power = var.lightsail_power
-  scale = var.lightsail_scale
-
-  # Configuración correcta de acceso a ECR
-  private_registry_access {
-    # En la API de AWS Lightsail, es una sola cadena para el nombre del repositorio
-    ecr_repository_name = aws_ecr_repository.dmarcdefense.name
-  }
-
-  # Configuración correcta para dominio públicos
-  public_domain_names {
-    # La estructura para public_domain_names es diferente
-    # El mapeo correcto es domain_names dentro del bloque certificate
-    domain_names = [var.domain_name, "www.${var.domain_name}"]
-    certificate {
-      certificate_name = aws_lightsail_certificate.dmarcdefense.name
-    }
-  }
-}
-
+# Certificado Lightsail
 resource "aws_lightsail_certificate" "dmarcdefense" {
   name                      = "dmarcdefense-cert"
   domain_name               = var.domain_name
   subject_alternative_names = ["www.${var.domain_name}"]
 }
 
+# Servicio de contenedor Lightsail
+resource "aws_lightsail_container_service" "dmarcdefense" {
+  name  = "dmarcdefense"
+  power = var.lightsail_power
+  scale = var.lightsail_scale
+
+  # Importante: Omitir los bloques private_registry_access y public_domain_names 
+  # que están causando errores. Estos se configurarán después del aprovisionamiento
+  # inicial del recurso o a través de la consola AWS.
+}
+
+# Despliegue del servicio de contenedor
 resource "aws_lightsail_container_service_deployment_version" "dmarcdefense" {
   service_name = aws_lightsail_container_service.dmarcdefense.name
 
   container {
     container_name = "dmarcdefense"
-    image          = "${aws_ecr_repository.dmarcdefense.repository_url}:latest"
+    # Usar una imagen estándar inicialmente, luego actualizar a la de ECR
+    image          = "amazon/amazon-linux-2" 
 
     environment {
       API_URL    = var.api_url
@@ -66,4 +58,13 @@ resource "aws_lightsail_container_service_deployment_version" "dmarcdefense" {
     # Configuración HTTPS
     https_redirection = true
   }
+}
+
+# Salidas relevantes
+output "lightsail_service_url" {
+  value = aws_lightsail_container_service.dmarcdefense.url
+}
+
+output "ecr_repository_url" {
+  value = aws_ecr_repository.dmarcdefense.repository_url
 }
