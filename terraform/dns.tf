@@ -17,7 +17,7 @@ resource "aws_route53_record" "spoofingtool" {
   zone_id = data.aws_route53_zone.dmarcdefense.zone_id
   name    = "spoofingtool.dmarcdefense.net"
   type    = "A"
-  
+
   alias {
     name                   = aws_cloudfront_distribution.dmarcdefense.domain_name
     zone_id                = aws_cloudfront_distribution.dmarcdefense.hosted_zone_id
@@ -29,7 +29,7 @@ resource "aws_route53_record" "www_spoofingtool" {
   zone_id = data.aws_route53_zone.dmarcdefense.zone_id
   name    = "www.spoofingtool.dmarcdefense.net"
   type    = "A"
-  
+
   alias {
     name                   = aws_cloudfront_distribution.dmarcdefense.domain_name
     zone_id                = aws_cloudfront_distribution.dmarcdefense.hosted_zone_id

@@ -20,7 +20,7 @@ resource "aws_lambda_function" "backup_lambda" {
   source_code_hash = filebase64sha256("${path.module}/lambda/backup_lambda.zip")
   runtime          = "nodejs18.x"
   timeout          = 60
-  
+
   environment {
     variables = {
       CONTAINER_SERVICE = aws_lightsail_container_service.dmarcdefense.name
@@ -32,7 +32,7 @@ resource "aws_lambda_function" "backup_lambda" {
 
 resource "aws_iam_role" "lambda_execution_role" {
   name = "dmarcdefense-lambda-role"
-  
+
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -50,7 +50,7 @@ resource "aws_iam_role" "lambda_execution_role" {
 resource "aws_iam_policy" "lambda_backup_policy" {
   name        = "dmarcdefense-lambda-backup-policy"
   description = "Permisos para ejecutar backup en Lightsail"
-  
+
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -72,7 +72,7 @@ resource "aws_iam_policy" "lambda_backup_policy" {
           "s3:PutObject",
           "s3:ListBucket"
         ]
-        Effect   = "Allow"
+        Effect = "Allow"
         Resource = [
           aws_s3_bucket.backups.arn,
           "${aws_s3_bucket.backups.arn}/*"

@@ -23,8 +23,8 @@ output "backup_bucket" {
 output "backup_commands" {
   description = "Comandos para ejecutar backup/restore manual"
   value = {
-    backup = "aws s3 cp s3://${aws_s3_bucket.backups.id}/scripts/backup.sh . && chmod +x backup.sh && ./backup.sh"
-    restore = "aws s3 cp s3://${aws_s3_bucket.backups.id}/scripts/restore.sh . && chmod +x restore.sh && ./restore.sh [nombre_backup]"
+    backup       = "aws s3 cp s3://${aws_s3_bucket.backups.id}/scripts/backup.sh . && chmod +x backup.sh && ./backup.sh"
+    restore      = "aws s3 cp s3://${aws_s3_bucket.backups.id}/scripts/restore.sh . && chmod +x restore.sh && ./restore.sh [nombre_backup]"
     list_backups = "aws s3 ls s3://${aws_s3_bucket.backups.id}/daily/ && aws s3 ls s3://${aws_s3_bucket.backups.id}/weekly/ && aws s3 ls s3://${aws_s3_bucket.backups.id}/monthly/"
   }
 }

@@ -2,7 +2,7 @@
 
 resource "local_file" "backup_script" {
   filename = "${path.module}/scripts/backup.sh"
-  content = <<-EOT
+  content  = <<-EOT
 #!/bin/bash
 
 # Variables - Configuradas por Terraform
@@ -84,7 +84,7 @@ EOT
 
 resource "local_file" "restore_script" {
   filename = "${path.module}/scripts/restore.sh"
-  content = <<-EOT
+  content  = <<-EOT
 #!/bin/bash
 
 # Variables - Configuradas por Terraform
@@ -131,7 +131,7 @@ fi
 # Descomprimir backup
 echo "Descomprimiendo backup..."
 gunzip -f "$RESTORE_DIR/$BACKUP_FILE"
-UNCOMPRESSED_FILE="${RESTORE_DIR}/${BACKUP_FILE%.gz}"
+UNCOMPRESSED_FILE="${RESTORE_DIR}/$(basename "$BACKUP_FILE" .gz)"
 
 if [ ! -f "$UNCOMPRESSED_FILE" ]; then
   echo "Error: Falló la descompresión del backup"
